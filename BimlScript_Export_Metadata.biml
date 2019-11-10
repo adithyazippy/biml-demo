@@ -1,0 +1,113 @@
+﻿<#@ import namespace="System.Data" #>
+<#@ import namespace="System.Data.SqlClient" #>
+<Biml xmlns="http://schemas.varigence.com/biml.xsd">
+    <#
+    string metadataConn = "Server=localhost;Initial Catalog=BIML_Demo;Integrated Security=SSPI;Provider=SQLNCLI11.1;";
+    
+    string serverName;
+    string databaseName;
+    
+    string columnName;
+    int columnLength;
+    
+    int fileID;
+    string fileName;
+    string exportFolder;
+    string delimiter;
+    string textQualifier;
+    string schemaName;
+    string tableName;
+    
+    DataTable ConnectionInfo;
+    DataTable DestinationFileMetadata;
+    DataTable DestinationColumns;
+    #>
+    <FileFormats>
+        <#
+        DestinationFileMetadata=ExternalDataAccess.GetDataTable(metadataConn, "GetDestinationMetadata");
+        foreach(DataRow row in DestinationFileMetadata.Rows) {
+            fileID=(int)row[0];
+            fileName=row[1].ToString();
+            exportFolder=row[2].ToString();
+            delimiter=row[3].ToString();
+            textQualifier=row[4].ToString();
+            //serverName=row[5].ToString();
+            //databaseName=row[6].ToString();
+            //schemaName=row[7].ToString();
+            tableName=row[8].ToString();
+        #>
+        <FlatFileFormat Name="FF <#=tableName#>" ColumnNamesInFirstDataRow="false" IsUnicode="false" RowDelimiter="CRLF" TextQualifier='<#=textQualifier#>'>
+            <Columns>
+                <#
+                DestinationColumns=ExternalDataAccess.GetDataTable(metadataConn, "GetColumns "+fileID);
+                int i=0;
+                int columnCount=DestinationColumns.Rows.Count;
+                foreach(DataRow r in DestinationColumns.Rows) {
+                    columnName=r[0].ToString();
+                    columnLength=(int)r[1];
+                    if (i == columnCount-1) {
+                        delimiter = "CRLF";
+                    }
+                #>
+                <Column Name="<#=columnName#>" DataType="AnsiString" Delimiter="<#=delimiter#>" Length="<#=columnLength#>" />
+                <# i=i+1;
+                } 
+                #>
+            </Columns>
+        </FlatFileFormat>
+        <# } #>
+    </FileFormats>
+    <Connections>
+        <#
+        ConnectionInfo=ExternalDataAccess.GetDataTable(metadataConn, "GetConnectionInfo");
+        foreach(DataRow row in ConnectionInfo.Rows) {
+            serverName=row[0].ToString();
+            databaseName=row[1].ToString();
+        #>
+        <OleDbConnection Name="<#=serverName#>_<#=databaseName#>" ConnectionString="Data Source=<#=serverName#>;Initial Catalog=<#=databaseName#>;Integrated Security=SSPI;Provider=SQLNCLI11.1;" />
+        <# } #>
+        <#
+        DestinationFileMetadata=ExternalDataAccess.GetDataTable(metadataConn, "GetDestinationMetadata");
+        foreach(DataRow row in DestinationFileMetadata.Rows) {
+            //fileID=(int)row[0];
+            fileName=row[1].ToString();
+            exportFolder=row[2].ToString();
+            //delimiter=row[3].ToString();
+            //textQualifier=row[4].ToString();
+            //serverName=row[5].ToString();
+            //databaseName=row[6].ToString();
+            //schemaName=row[7].ToString();
+            tableName=row[8].ToString();
+        #>
+        <FlatFileConnection Name="FF_<#=tableName#>" FileFormat="FF <#=tableName#>" FilePath="<#=exportFolder#><#=fileName#>" />
+        <# } #>
+    </Connections>
+    <Packages>
+        <Package Name="Export Package">
+            <Tasks>
+                <#
+                DestinationFileMetadata=ExternalDataAccess.GetDataTable(metadataConn, "GetDestinationMetadata");
+                foreach(DataRow row in DestinationFileMetadata.Rows) {
+                    //fileID=(int)row[0];
+                    fileName=row[1].ToString();
+                    exportFolder=row[2].ToString();
+                    //delimiter=row[3].ToString();
+                    //textQualifier=row[4].ToString();
+                    serverName=row[5].ToString();
+                    databaseName=row[6].ToString();
+                    schemaName=row[7].ToString();
+                    tableName=row[8].ToString();
+                #>
+                <Dataflow Name="Export <#=tableName#>">
+                    <Transformations>
+                        <OleDbSource Name="Read Data" ConnectionName="<#=serverName#>_<#=databaseName#>">
+                            <ExternalTableInput Table="<#=schemaName#>.<#=tableName#>" />
+                        </OleDbSource>
+                        <FlatFileDestination Name="Write Data" ConnectionName="FF_<#=tableName#>" />
+                    </Transformations>
+                </Dataflow>
+                <# } #>
+            </Tasks>
+        </Package>
+    </Packages>
+</Biml>

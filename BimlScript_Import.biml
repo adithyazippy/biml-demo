@@ -1,0 +1,47 @@
+﻿<Biml xmlns="http://schemas.varigence.com/biml.xsd">
+    <Connections>
+        <OleDbConnection Name="BIML_Demo" ConnectionString="Data Source=.;Initial Catalog=BIML_Demo;Integrated Security=SSPI;Provider=SQLNCLI11.1;" />
+        <FlatFileConnection Name="FF_Conn" FileFormat="FF_Format" FilePath="D:\BIML_Sample.txt">
+            <Expressions>
+                <Expression PropertyName="ConnectionString">@[User::FullFilePath]</Expression>
+            </Expressions>
+        </FlatFileConnection>
+    </Connections>
+    <FileFormats>
+        <FlatFileFormat Name="FF_Format" RowDelimiter="CRLF" IsUnicode="false" CodePage="1252">
+            <Columns>
+                <Column Name="ID" DataType="AnsiString" Delimiter="|" Length="100" />
+                <Column Name="Val" DataType="AnsiString" Delimiter="|" Length="100" />
+                <Column Name="AddDate" DataType="AnsiString" Delimiter="CRLF" Length="100" />
+            </Columns>
+        </FlatFileFormat>
+    </FileFormats>
+    <Packages>
+        <Package Name="BIML_Import" ConstraintMode="Linear">
+            <Variables>
+                <Variable Name="SourceFolder" DataType="String">D:\BIML_Import\</Variable>
+                <Variable Name="FullFilePath" DataType="String">D:\BIML_Import\BIML_Sample.txt</Variable>
+            </Variables>
+            <Tasks>
+                <ForEachFileLoop Name="Loop over files" Folder="D:\BIML_Import\" FileSpecification="BIML_*.txt" ConstraintMode="Parallel" RetrieveFileNameFormat="FullyQualified" >
+                    <VariableMappings>
+                        <VariableMapping Name="Mapping" VariableName="User.FullFilePath" />
+                    </VariableMappings>
+                    <Expressions>
+                        <Expression PropertyName="Directory">@[User::SourceFolder]</Expression>
+                    </Expressions>
+                    <Tasks>
+                        <Dataflow Name="Import Data">
+                            <Transformations>
+                                <FlatFileSource Name="Read Data" ConnectionName="FF_Conn" RetainNulls="true" />
+                                <OleDbDestination Name="Write Data" ConnectionName="BIML_Demo" UseFastLoadIfAvailable="true">
+                                    <ExternalTableOutput Table="dbo.BIML_Import" />
+                                </OleDbDestination>
+                            </Transformations>
+                        </Dataflow>
+                    </Tasks>
+                </ForEachFileLoop>
+            </Tasks>
+        </Package>
+    </Packages>
+</Biml>

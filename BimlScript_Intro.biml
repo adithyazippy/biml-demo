@@ -1,0 +1,24 @@
+﻿<Biml xmlns="http://schemas.varigence.com/biml.xsd">
+    <Connections>
+        <OleDbConnection Name="BIML_Demo" ConnectionString="Data Source=.;Initial Catalog=BIML_Demo;Integrated Security=SSPI;Provider=SQLNCLI11.1;" />
+    </Connections>
+    <Packages>
+        <Package Name="BIML_Intro" ConstraintMode="Linear">
+            <Tasks>
+                <ExecuteSQL Name="Create or Drop Table" ConnectionName="BIML_Demo">
+                    <DirectInput>
+                        IF EXISTS(SELECT 1 FROM sys.objects WHERE name='BIML_Intro' AND type='U')
+                        	DROP TABLE BIML_Intro;
+                        CREATE TABLE BIML_Intro(ID INT, Val VARCHAR(50), AddDate DATETIME);
+                    </DirectInput>
+                </ExecuteSQL>
+                <ExecuteSQL Name="Insert Data" ConnectionName="BIML_Demo">
+                    <DirectInput>
+                        INSERT INTO BIML_Intro(ID, Val, AddDate)
+                        VALUES(1,'A',GETDATE());
+                    </DirectInput>
+                </ExecuteSQL>
+            </Tasks>
+        </Package>
+    </Packages>
+</Biml>

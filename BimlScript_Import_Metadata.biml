@@ -1,0 +1,142 @@
+﻿<#@ import namespace="System.Data"#>
+<#@ import namespace="System.Data.SqlClient"#>
+<Biml xmlns="http://schemas.varigence.com/biml.xsd">
+    <#
+    string metadataConn="Server=localhost;Initial Catalog=BIML_Demo;Integrated Security=SSPI;Provider=SQLNCLI11.1;";
+    string fileID;
+    string fileName;
+    string importFolder;
+    string delimiter;
+    string textQualifier;
+    bool truncateOnLoad;
+    string schemaName;
+    string tableName;
+    
+    DataTable FileMetadata;
+    DataTable ColumnMetadata;
+    DataTable ConnectionInfo;
+    
+    string columnName;
+    int columnLength;
+    string fileNameClean;
+    
+    string serverName;
+    string databaseName;
+    #>
+    <FileFormats>
+        <#
+        FileMetadata=ExternalDataAccess.GetDataTable(metadataConn, "GetMetadata");
+        foreach(DataRow row in FileMetadata.Rows) {
+            fileID=row[0].ToString();
+            //fileName=row[1].ToString();
+            //importFolder=row[2].ToString();
+            delimiter=row[3].ToString();
+            textQualifier=row[4].ToString();
+            //truncateOnLoad=(bool)row[5];
+            //serverName=row[6].ToString();
+            //databaseName=row[7].ToString();
+            //schemaName=row[8].ToString();
+            tableName=row[9].ToString();
+        #>
+        <FlatFileFormat Name="FF <#=tableName#>" TextQualifier='<#=textQualifier#>' IsUnicode="false">
+            <Columns>
+                <#
+                ColumnMetadata=ExternalDataAccess.GetDataTable(metadataConn,"GetColumns "+fileID);
+                int i=0;
+                int columnCount=ColumnMetadata.Rows.Count;
+                foreach(DataRow r in ColumnMetadata.Rows) {
+                    columnName=r[0].ToString();
+                    columnLength=(int)r[1];
+                    if(i == columnCount-1) {
+                        delimiter="CRLF";
+                    }
+                #>
+                <Column Name="<#=columnName#>" DataType="AnsiString" Delimiter="<#=delimiter#>" Length="<#=columnLength#>" />
+                <# i=i+1; } #>
+            </Columns>
+        </FlatFileFormat>
+        <# } #>
+    </FileFormats>
+    <Connections>
+        <#
+        ConnectionInfo=ExternalDataAccess.GetDataTable(metadataConn, "GetConnectionInfo");
+        foreach(DataRow row in ConnectionInfo.Rows) {
+            serverName=row[0].ToString();
+            databaseName=row[1].ToString();
+        #>
+        <OleDbConnection Name="<#=serverName#>_<#=databaseName#>" ConnectionString="Data Source=<#=serverName#>;Initial Catalog=<#=databaseName#>;Integrated Security=SSPI;Provider=SQLNCLI11.1;" />
+        <# } #>
+        <#
+        foreach(DataRow row in FileMetadata.Rows) {
+            //fileID=row[0].ToString();
+            fileName=row[1].ToString();
+            importFolder=row[2].ToString();
+            //delimiter=row[3].ToString();
+            //textQualifier=row[4].ToString();
+            //truncateOnLoad=(bool)row[5];
+            //serverName=row[6].ToString();
+            //databaseName=row[7].ToString();
+            //schemaName=row[8].ToString();
+            tableName=row[9].ToString();
+            
+            fileNameClean=fileName.Replace("*","").Replace("_","");
+        #>
+        <FlatFileConnection Name="FF_<#=fileNameClean#>" FilePath="<#=importFolder#>invalid.txt" FileFormat="FF <#=tableName#>">
+            <Expressions>
+                <Expression PropertyName="ConnectionString">@[User::FullFilePath]</Expression>
+            </Expressions>
+        </FlatFileConnection>
+        <# } #>
+    </Connections>
+    <Packages>
+        <#
+        foreach(DataRow row in FileMetadata.Rows) {
+            //fileID=row[0].ToString();
+            fileName=row[1].ToString();
+            importFolder=row[2].ToString();
+            //delimiter=row[3].ToString();
+            //textQualifier=row[4].ToString();
+            truncateOnLoad=(bool)row[5];
+            serverName=row[6].ToString();
+            databaseName=row[7].ToString();
+            schemaName=row[8].ToString();
+            tableName=row[9].ToString();
+            
+            fileNameClean=fileName.Replace("*","").Replace("_","");
+        #>
+        <Package Name="Import <#=tableName#>" ConstraintMode="Linear">
+            <Variables>
+                <Variable Name="SourceFolder" DataType="String"><#=importFolder#></Variable>
+                <Variable Name="FullFilePath" DataType="String"><#=importFolder#>invalid.txt</Variable>
+            </Variables>
+            <Tasks>
+                <#
+                if(truncateOnLoad) {
+                #>
+                <ExecuteSQL Name="Truncate Table <#=tableName#>" ConnectionName="<#=serverName#>_<#=databaseName#>">
+                    <DirectInput>TRUNCATE TABLE <#=schemaName#>.<#=tableName#>;</DirectInput>
+                </ExecuteSQL>
+                <# } #>
+                <ForEachFileLoop Name="Loop over files" Folder="<#=importFolder#>" FileSpecification="<#=fileName#>" RetrieveFileNameFormat="FullyQualified">
+                    <VariableMappings>
+                        <VariableMapping Name="Mapping" VariableName="User.FullFilePath" />
+                    </VariableMappings>
+                    <Expressions>
+                        <Expression PropertyName="Directory">@[User::SourceFolder]</Expression>
+                    </Expressions>
+                    <Tasks>
+                        <Dataflow Name="Import Data File">
+                            <Transformations>
+                                <FlatFileSource Name="Read Flat File" ConnectionName="FF_<#=fileNameClean#>" RetainNulls="true"/>
+                                <OleDbDestination Name="Write Data to Table" ConnectionName="<#=serverName#>_<#=databaseName#>" UseFastLoadIfAvailable="true">
+                                    <ExternalTableOutput Table="<#=schemaName#>.<#=tableName#>" />
+                                </OleDbDestination>
+                            </Transformations>
+                        </Dataflow>
+                    </Tasks>
+                </ForEachFileLoop>
+            </Tasks>
+        </Package>
+        <# } #>
+    </Packages>
+</Biml>
